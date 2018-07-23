@@ -12,7 +12,7 @@ https://en.wikipedia.org/wiki/Flash_memory#NOR_memories
 #include "mbed.h"
 #include "SPIFBlockDevice.h"
 
-// Create flash device on SPI bus with PTE5 as chip select
+// Create flash device on SPI bus with SPI0_CSN1 as chip select
 SPIFBlockDevice spif(SPI0_MOSI, SPI0_MISO, SPI0_SCLK, SPI0_CSN1);
 
 int main() {
