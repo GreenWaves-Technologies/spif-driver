@@ -61,6 +61,12 @@
              "SPI_MISO": "PA_6",
              "SPI_CLK":  "PA_5",
              "SPI_CS":   "PB_12"
+       },
+         "GAP8": {
+             "SPI_MOSI": "SPI0_MOSI",
+             "SPI_MISO": "SPI0_MISO",
+             "SPI_CLK":  "SPI0_SCLK",
+             "SPI_CS":   "SPI0_CSN1"
        }
     }
 }

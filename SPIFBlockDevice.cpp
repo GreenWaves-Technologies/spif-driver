@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ Modifications copyright (C) 2018 GreenWaves Technologies
+
+ - User can not control th cs pin, the pin is controlled by uDMA.
+ - uDMA only use L2 address, so use global L2 memory buffer
+ */
 
 #include "SPIFBlockDevice.h"
 
@@ -49,9 +55,8 @@ enum ops {
  
 SPIFBlockDevice::SPIFBlockDevice(
     PinName mosi, PinName miso, PinName sclk, PinName cs, int freq)
-    : _spi(mosi, miso, sclk), _cs(cs), _size(0)
+    : _spi(mosi, miso, sclk, cs), _size(0)
 {
-    _cs = 1;
     _spi.frequency(freq);
 }
 
@@ -59,7 +64,7 @@ int SPIFBlockDevice::init()
 {
     // Check for vendor specific hacks, these should move into more general
     // handling when possible. RDID is not used to verify a device is attached.
-    uint8_t id[3];
+    uint8_t *id = (uint8_t *) buffer;
     _cmdread(SPIF_RDID, 0, 3, 0x0, id);
 
     switch (id[0]) {
@@ -79,7 +84,7 @@ int SPIFBlockDevice::init()
 
     // Check JEDEC serial flash discoverable parameters for device
     // specific info
-    uint8_t header[16];
+    uint8_t *header = buffer;
     _cmdread(SPIF_SFDP, 4, 16, 0x0, header);
 
     // Verify SFDP signature for sanity
@@ -100,7 +105,7 @@ int SPIFBlockDevice::init()
         (header[14] << 24) |
         (header[13] << 16) |
         (header[12] << 8 ));
-    uint8_t table[8];
+    uint8_t *table = (uint8_t *) buffer;
     _cmdread(SPIF_SFDP, 4, 8, table_addr, table);
 
     // Check erase size, currently only supports 4kbytes
@@ -141,17 +146,22 @@ void SPIFBlockDevice::_cmdread(
         uint8_t op, uint32_t addrc, uint32_t retc,
         uint32_t addr, uint8_t *rets)
 {
-    _cs = 0;
-    _spi.write(op);
+    spi_command_sequence_t s_command;
+    memset(&s_command, 0, sizeof(spi_command_sequence_t));
 
-    for (uint32_t i = 0; i < addrc; i++) {
-        _spi.write(0xff & (addr >> 8*(addrc-1 - i)));
+    s_command.cmd       = op;
+    s_command.cmd_bits  = 8;
+    if(addrc) {
+        s_command.addr_bits = addrc << 3;
+        s_command.addr      = addr << (32 - s_command.addr_bits); // always the highest n-bits
     }
 
-    for (uint32_t i = 0; i < retc; i++) {
-        rets[i] = _spi.write(0);
+    if(retc) {
+        s_command.rx_bits   = retc << 3;
+        s_command.rx_buffer = (uint8_t *) rets;
     }
-    _cs = 1;
+
+    _spi.transfer_command_sequence(&s_command);
 
     if (SPIF_DEBUG) {
         printf("spif <- %02x", op);
@@ -177,17 +187,30 @@ void SPIFBlockDevice::_cmdwrite(
         uint8_t op, uint32_t addrc, uint32_t argc,
         uint32_t addr, const uint8_t *args)
 {
-    _cs = 0;
-    _spi.write(op);
+    spi_command_sequence_t s_command;
+    memset(&s_command, 0, sizeof(spi_command_sequence_t));
 
-    for (uint32_t i = 0; i < addrc; i++) {
-        _spi.write(0xff & (addr >> 8*(addrc-1 - i)));
+    s_command.cmd       = op;
+    s_command.cmd_bits  = 8;
+    if(addrc) {
+        s_command.addr_bits = addrc << 3;
+        s_command.addr      = addr << (32 - s_command.addr_bits); // always the highest n-bits
     }
 
-    for (uint32_t i = 0; i < argc; i++) {
-        _spi.write(args[i]);
+    if(argc) {
+        s_command.tx_bits   = argc << 3;
+
+        if(argc > 4) {
+            s_command.tx_buffer = (uint8_t *) args; // Page size = 256
+        } else {
+            s_command.tx_data = 0;
+            for (uint32_t i = 0; i < argc; i++) {
+                s_command.tx_data |= (args[i] << 8*i); // Page size = 256
+            }
+        }
     }
-    _cs = 1;
+
+    _spi.transfer_command_sequence(&s_command);
 
     if (SPIF_DEBUG) {
         printf("spif -> %02x", op);
@@ -213,11 +236,11 @@ int SPIFBlockDevice::_sync()
 {
     for (int i = 0; i < SPIF_TIMEOUT; i++) {
         // Read status register until write not-in-progress
-        uint8_t status;
-        _cmdread(SPIF_RDSR, 0, 1, 0x0, &status);
+        uint8_t *status = (uint8_t *) buffer;
+        _cmdread(SPIF_RDSR, 0, 1, 0x0, status);
 
         // Check WIP bit
-        if (!(status & SPIF_WIP)) {
+        if (!(status[0] & SPIF_WIP)) {
             return 0;
         }
 
@@ -233,11 +256,11 @@ int SPIFBlockDevice::_wren()
 
     for (int i = 0; i < SPIF_TIMEOUT; i++) {
         // Read status register until write latch is enabled
-        uint8_t status;
-        _cmdread(SPIF_RDSR, 0, 1, 0x0, &status);
+        uint8_t *status = (uint8_t *) buffer;
+        _cmdread(SPIF_RDSR, 0, 1, 0x0, status);
 
         // Check WEL bit
-        if (status & SPIF_WEL) {
+        if (status[0] & SPIF_WEL) {
             return 0;
         }
 

@@ -13,6 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ Modifications copyright (C) 2018 GreenWaves Technologies
+
+ - User can not control th cs pin, the pin is controlled by uDMA.
+ - uDMA only use L2 address, so use global L2 memory buffer
+ */
+
 #ifndef MBED_SPIF_BLOCK_DEVICE_H
 #define MBED_SPIF_BLOCK_DEVICE_H
 
@@ -158,8 +166,8 @@ public:
 private:
     // Master side hardware
     SPI _spi;
-    DigitalOut _cs;
-
+    // L2 Buffer
+    uint8_t buffer[16];
     // Device configuration discovered through sfdp
     bd_size_t _size;
 

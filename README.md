@@ -8,12 +8,12 @@ More info on NOR flash can be found on wikipedia:
 https://en.wikipedia.org/wiki/Flash_memory#NOR_memories
 
 ``` cpp
-// Here's an example using the MX25R SPI flash device on the K82F
+// Here's an example using the MX25R SPI flash device on the GAP8
 #include "mbed.h"
 #include "SPIFBlockDevice.h"
 
 // Create flash device on SPI bus with PTE5 as chip select
-SPIFBlockDevice spif(PTE2, PTE4, PTE1, PTE5);
+SPIFBlockDevice spif(SPI0_MOSI, SPI0_MISO, SPI0_SCLK, SPI0_CSN1);
 
 int main() {
     printf("spif test\n");
@@ -37,6 +37,7 @@ int main() {
 
     // Deinitialize the device
     spif.deinit();
+    free(buffer);
 }
 ```
 
