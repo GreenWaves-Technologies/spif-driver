@@ -11,6 +11,9 @@ using namespace utest::v1;
 #if defined(TARGET_K82F)
 #define TEST_PINS PTE2, PTE4, PTE1, PTE5
 #define TEST_FREQ 40000000
+#elif defined(GAP8)
+#define TEST_PINS SPI0_MOSI, SPI0_MISO, SPI0_SCLK, SPI0_CSN1
+#define TEST_FREQ 20000000
 #else
 #define TEST_PINS D11, D12, D13, D10
 #define TEST_FREQ 1000000
